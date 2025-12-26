@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>T98 Cloud Tool v54 - Mobile Optimized</title>
+    <title>T98 Cloud Tool v54</title>
     <style>
         :root { --primary: #00f2fe; --secondary: #4facfe; --accent-ot: #fa709a; --accent-ot-end: #fee140; --success: #43e97b; --danger: #ff5858; --text: #e0e6ed; --text-muted: #8ba0b6; --border: rgba(255,255,255,0.15); }
         
@@ -74,7 +74,7 @@
         <div class="card">
             <h2>LỰA CHỌN NHÂN VIÊN</h2>
             <select id="staffSelect"></select>
-            <label>ĐỊA ĐIỂM HỢP LỆ</label>
+            <label>CHỌN ĐỊA ĐIỂM</label>
             <select id="locSelect"></select>
             <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; border: 1px dashed var(--border); font-family: monospace; font-size: 11px;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>IP:</span> <span id="lblIP" style="color:var(--primary);">...</span></div>
@@ -180,7 +180,11 @@
                 const tr = document.createElement('tr');
                 if(s.st === "XONG") tr.style.opacity = "0.5";
                 const badge = s.type == 'OT' ? 'badge-ot' : 'badge-office';
-                tr.innerHTML = `<td>${new Date(s.time).toLocaleString('vi-VN')}</td><td><span class="${badge}">${s.type}</span></td><td>${s.sName}</td><td>${s.lName}</td><td style="color:${s.st === 'XONG' ? 'var(--success)' : 'var(--primary)'}; font-weight:bold">${s.st}</td><td style="text-align:right">${s.st !== "XONG" ? `<button class="btn-del-item" onclick="delSched('${s.id}')">XÓA</button>` : ''}</td>`;
+                
+                // Sửa hiển thị HÀNH CHÍNH thành HC tại đây
+                const displayType = s.type === 'HÀNH CHÍNH' ? 'HC' : s.type;
+
+                tr.innerHTML = `<td>${new Date(s.time).toLocaleString('vi-VN')}</td><td><span class="${badge}">${displayType}</span></td><td>${s.sName}</td><td>${s.lName}</td><td style="color:${s.st === 'XONG' ? 'var(--success)' : 'var(--primary)'}; font-weight:bold">${s.st}</td><td style="text-align:right">${s.st !== "XONG" ? `<button class="btn-del-item" onclick="delSched('${s.id}')">XÓA</button>` : ''}</td>`;
                 b.appendChild(tr);
             });
         }
@@ -212,3 +216,4 @@
     </script>
 </body>
 </html>
+
