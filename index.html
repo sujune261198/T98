@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>T98 Cloud Tool v54 - Confirm Edition</title>
+    <title>T98 Cloud Tool v54</title>
     <style>
         :root { --primary: #00f2fe; --secondary: #4facfe; --accent-ot: #fa709a; --accent-ot-end: #fee140; --success: #43e97b; --danger: #ff5858; --text: #e0e6ed; --text-muted: #8ba0b6; --border: rgba(255,255,255,0.15); }
         body { margin: 0; padding: 20px; font-family: 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: var(--text); display: grid; grid-template-columns: 360px 1fr; gap: 25px; height: 100vh; box-sizing: border-box; overflow: hidden; }
@@ -30,9 +30,29 @@
         table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
         th { background: rgba(0,0,0,0.4); position: sticky; top: 0; color: var(--text-muted); }
+
+        /* CUSTOM MODAL CSS */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 9999; }
+        .modal-box { width: 90%; max-width: 400px; background: #1a1a2e; border: 2px solid var(--primary); border-radius: 20px; padding: 25px; box-shadow: 0 0 20px var(--primary); text-align: center; }
+        .modal-title { font-weight: bold; color: var(--primary); margin-bottom: 15px; font-size: 16px; text-transform: uppercase; }
+        .modal-body { font-size: 14px; line-height: 1.6; color: #fff; margin-bottom: 25px; text-align: left; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; }
+        .modal-footer { display: flex; gap: 15px; }
+        .btn-modal-confirm { background: var(--success); color: #000; flex: 1; }
+        .btn-modal-cancel { background: var(--danger); color: #fff; flex: 1; }
     </style>
 </head>
 <body>
+    <div id="confirmModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-title">Xác nhận chấm công</div>
+            <div id="modalContent" class="modal-body"></div>
+            <div class="modal-footer">
+                <button class="btn-modal-cancel" onclick="closeModal()">HỦY BỎ</button>
+                <button id="modalConfirmBtn" class="btn-modal-confirm">XÁC NHẬN</button>
+            </div>
+        </div>
+    </div>
+
     <div class="sidebar">
         <div class="card">
             <h2>LỰA CHỌN NHÂN VIÊN</h2>
@@ -47,8 +67,8 @@
         <div class="card">
             <h2>CHẤM CÔNG THỦ CÔNG</h2>
             <div class="btn-row">
-                <button onclick="confirmManual('HÀNH CHÍNH')" class="btn-office">HÀNH CHÍNH</button>
-                <button onclick="confirmManual('OT')" class="btn-ot">TĂNG CA (OT)</button>
+                <button onclick="showConfirm('HÀNH CHÍNH')" class="btn-office">HÀNH CHÍNH</button>
+                <button onclick="showConfirm('OT')" class="btn-ot">TĂNG CA (OT)</button>
             </div>
         </div>
         <div class="card">
@@ -84,6 +104,36 @@
 
         let staffs = [], locs = [], scheds = JSON.parse(localStorage.getItem('schedules')) || [];
 
+        // MODAL FUNCTIONS
+        function showConfirm(type) {
+            const sIdx = document.getElementById('staffSelect').value;
+            const lIdx = document.getElementById('locSelect').value;
+            const staff = staffs[sIdx];
+            const loc = locs[lIdx];
+            
+            const modal = document.getElementById('confirmModal');
+            const content = document.getElementById('modalContent');
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+
+            content.innerHTML = `
+                <b>• Loại:</b> ${type}<br>
+                <b>• Nhân viên:</b> ${staff.name} (#${staff.id})<br>
+                <b>• Địa điểm:</b> ${loc.name}<br>
+                <b>• Thời gian:</b> ${new Date().toLocaleTimeString('vi-VN')}
+            `;
+
+            modal.style.display = 'flex';
+
+            confirmBtn.onclick = () => {
+                manual(type);
+                closeModal();
+            };
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+        }
+
         async function fetchCloudData() {
             try {
                 const res = await fetch(DATA_URL + "?t=" + Date.now());
@@ -98,12 +148,7 @@
             }
         }
 
-        window.onload = () => { 
-            fetchCloudData(); renderSched(); startClock(); 
-            document.getElementById('staffSelect').onchange = updateLocs; 
-            document.getElementById('sStaff').onchange = updateSchedLocs; 
-            document.getElementById('locSelect').onchange = updateInfo; 
-        };
+        window.onload = () => { fetchCloudData(); renderSched(); startClock(); document.getElementById('staffSelect').onchange = updateLocs; document.getElementById('sStaff').onchange = updateSchedLocs; document.getElementById('locSelect').onchange = updateInfo; };
 
         function renderStaffs() {
             const h = staffs.map((s, i) => `<option value="${i}">${s.name} (#${s.id})</option>`).join('');
@@ -126,26 +171,6 @@
         function updateInfo() {
             const s = staffs[document.getElementById('staffSelect').value];
             if(s) { document.getElementById('lblIP').innerText = s.ip; document.getElementById('lblDevice').innerText = s.device; }
-        }
-
-        // PHẦN THÔNG BÁO XÁC NHẬN KHI BẤM NÚT THỦ CÔNG
-        function confirmManual(type) {
-            const sSelect = document.getElementById('staffSelect');
-            const lSelect = document.getElementById('locSelect');
-            
-            const staffName = sSelect.options[sSelect.selectedIndex].text;
-            const locName = lSelect.options[lSelect.selectedIndex].text;
-            const currentTime = new Date().toLocaleTimeString('vi-VN');
-
-            const msg = `XÁC NHẬN CHẤM CÔNG:\n` +
-                        `- Loại: ${type}\n` +
-                        `- Nhân viên: ${staffName}\n` +
-                        `- Địa điểm: ${locName}\n` +
-                        `- Thời gian: ${currentTime}`;
-
-            if(confirm(msg)) {
-                manual(type);
-            }
         }
 
         function addSched() {
