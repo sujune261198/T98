@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>T98 Cloud Tool v54</title>
+    <title>T98 Cloud Tool v54 - Realtime</title>
     <style>
         :root { --primary: #00f2fe; --secondary: #4facfe; --accent-ot: #fa709a; --accent-ot-end: #fee140; --success: #43e97b; --danger: #ff5858; --text: #e0e6ed; --text-muted: #8ba0b6; --border: rgba(255,255,255,0.15); }
         body { margin: 0; padding: 20px; font-family: 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: var(--text); display: grid; grid-template-columns: 360px 1fr; gap: 25px; height: 100vh; box-sizing: border-box; overflow: hidden; }
@@ -31,7 +31,6 @@
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
         th { background: rgba(0,0,0,0.4); position: sticky; top: 0; color: var(--text-muted); }
 
-        /* CUSTOM MODAL CSS */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 9999; }
         .modal-box { width: 90%; max-width: 400px; background: #1a1a2e; border: 2px solid var(--primary); border-radius: 20px; padding: 25px; box-shadow: 0 0 20px var(--primary); text-align: center; }
         .modal-title { font-weight: bold; color: var(--primary); margin-bottom: 15px; font-size: 16px; text-transform: uppercase; }
@@ -57,7 +56,7 @@
         <div class="card">
             <h2>LỰA CHỌN NHÂN VIÊN</h2>
             <select id="staffSelect"></select>
-            <label>ĐỊA ĐIỂM HỢP LỆ</label>
+            <label>ĐỊA ĐIỂM</label>
             <select id="locSelect"></select>
             <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; border: 1px dashed var(--border); font-family: monospace; font-size: 11px;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>IP:</span> <span id="lblIP" style="color:var(--primary);">...</span></div>
@@ -67,8 +66,8 @@
         <div class="card">
             <h2>CHẤM CÔNG THỦ CÔNG</h2>
             <div class="btn-row">
-                <button onclick="showConfirm('HÀNH CHÍNH')" class="btn-office">HÀNH CHÍNH</button>
-                <button onclick="showConfirm('OT')" class="btn-ot">TĂNG CA (OT)</button>
+                <button onclick="showConfirmManual('HÀNH CHÍNH')" class="btn-office">HÀNH CHÍNH</button>
+                <button onclick="showConfirmManual('OT')" class="btn-ot">TĂNG CA (OT)</button>
             </div>
         </div>
         <div class="card">
@@ -101,39 +100,83 @@
         const API_OFFICE = "https://hrm-api.megaads.vn/api/staff/send-finger-print";
         const API_OT = "https://hrm-api.megaads.vn/api/staff/time-keeping/overtime";
         const DATA_URL = "https://raw.githubusercontent.com/thuangeminipro-byte/phapsuchuongmy/refs/heads/main/data.json";
+        
+        // THAY URL WEB APP GOOGLE MỚI CỦA BẠN VÀO ĐÂY
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw6l9aTPCmISM4X4pa3qrhJtMQHqqiF5RcGzfu_ueSfefcyVRgC6KmNp5P2IQbnBA5VZA/exec";
 
-        let staffs = [], locs = [], scheds = JSON.parse(localStorage.getItem('schedules')) || [];
+        let staffs = [], locs = [];
 
-        // MODAL FUNCTIONS
-        function showConfirm(type) {
+        async function loadSchedFromSheet() {
+            try {
+                const res = await fetch(GOOGLE_SCRIPT_URL);
+                const data = await res.json();
+                renderSchedTable(data);
+            } catch (e) { console.log("Đang load lịch..."); }
+        }
+
+        async function addSched() {
+            const t = document.getElementById('sTime').value;
+            if(!t) return alert("Chọn giờ!");
+            const sS = document.getElementById('sStaff'), lS = document.getElementById('sLoc');
+            const stObj = staffs[sS.value]; const lcObj = locs[lS.value]; const type = document.getElementById('sType').value;
+
+            const packet = {
+                id: Date.now(), time: t, type: type, sName: stObj.name, lName: lcObj.name,
+                api: type === 'OT' ? API_OT : API_OFFICE,
+                payload: { staff_id: stObj.id, location_data: { lat: lcObj.lat, long: lcObj.lng, ip: stObj.ip, location_name: lcObj.name } }
+            };
+
+            log("Đang gửi lịch hẹn lên Google Cloud...");
+            await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(packet) });
+            log("Đặt lịch thành công!", "var(--primary)");
+            setTimeout(loadSchedFromSheet, 2000);
+        }
+
+        function renderSchedTable(data) {
+            const b = document.getElementById('schedBody'); b.innerHTML = '';
+            data.forEach(s => {
+                const tr = document.createElement('tr');
+                if(s.st === "XONG") tr.style.opacity = "0.6";
+                const badge = s.type == 'OT' ? 'badge-ot' : 'badge-office';
+                tr.innerHTML = `
+                    <td>${new Date(s.time).toLocaleString('vi-VN')}</td>
+                    <td><span class="${badge}">${s.type}</span></td>
+                    <td>${s.sName}</td>
+                    <td>${s.lName}</td>
+                    <td style="color:${s.st === 'XONG' ? 'var(--success)' : 'var(--primary)'}; font-weight:bold">${s.st}</td>
+                    <td style="text-align:right"><button class="btn-del-item" style="opacity:0.3; pointer-events:none">AUTO</button></td>
+                `;
+                b.appendChild(tr);
+            });
+        }
+
+        function showConfirmManual(type) {
             const sIdx = document.getElementById('staffSelect').value;
             const lIdx = document.getElementById('locSelect').value;
-            const staff = staffs[sIdx];
-            const loc = locs[lIdx];
-            
+            const staff = staffs[sIdx]; const loc = locs[lIdx];
             const modal = document.getElementById('confirmModal');
             const content = document.getElementById('modalContent');
-            const confirmBtn = document.getElementById('modalConfirmBtn');
-
-            content.innerHTML = `
-                <b>• Loại:</b> ${type}<br>
-                <b>• Nhân viên:</b> ${staff.name} (#${staff.id})<br>
-                <b>• Địa điểm:</b> ${loc.name}<br>
-                <b>• Thời gian:</b> ${new Date().toLocaleTimeString('vi-VN')}
-            `;
-
+            content.innerHTML = `<b>• Chế độ:</b> THỦ CÔNG<br><b>• Loại:</b> ${type}<br><b>• Nhân viên:</b> ${staff.name}<br><b>• Địa điểm:</b> ${loc.name}`;
             modal.style.display = 'flex';
-
-            confirmBtn.onclick = () => {
-                manual(type);
-                closeModal();
-            };
+            document.getElementById('modalConfirmBtn').onclick = () => { manual(type); closeModal(); };
         }
 
-        function closeModal() {
-            document.getElementById('confirmModal').style.display = 'none';
+        function closeModal() { document.getElementById('confirmModal').style.display = 'none'; }
+
+        async function trigger(type, st, lc) {
+            log(`Gửi lệnh trực tiếp [${type}]...`);
+            try {
+                const res = await fetch(type == 'OT' ? API_OT : API_OFFICE, { 
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ staff_id: st.id, location_data: { lat: lc.lat, long: lc.lng, ip: st.ip, location_name: lc.name } }) 
+                });
+                const d = await res.json(); log(`[Xong] ${d.message || 'Thành công'}`);
+            } catch (e) { log("Lỗi: Kiểm tra CORS!", "#ff5858"); }
         }
 
+        function manual(t) { trigger(t, staffs[document.getElementById('staffSelect').value], locs[document.getElementById('locSelect').value]); }
+        function log(m, c = "var(--success)") { const d = document.createElement('div'); d.style.color = (c=="var(--success)" ? "var(--success)" : c); d.innerText = `> ${new Date().toLocaleTimeString()} ${m}`; document.getElementById('logs').prepend(d); }
+        
         async function fetchCloudData() {
             try {
                 const res = await fetch(DATA_URL + "?t=" + Date.now());
@@ -141,30 +184,22 @@
                 staffs = data.staffs; locs = data.locs;
                 renderStaffs(); updateLocs(); updateSchedLocs();
                 document.getElementById('syncStat').innerHTML = `<span style="color:var(--success);">● Đồng bộ Cloud thành công</span>`;
-                log("Đã cập nhật dữ liệu mới nhất từ Server.");
-            } catch (e) { 
-                document.getElementById('syncStat').innerHTML = `<span style="color:var(--danger);">● Lỗi kết nối Server</span>`;
-                log("Lỗi: Không thể tải data.json.", "#ff5858"); 
-            }
+            } catch (e) { document.getElementById('syncStat').innerHTML = `<span style="color:var(--danger);">● Lỗi kết nối Server</span>`; }
         }
 
-        window.onload = () => { fetchCloudData(); renderSched(); startClock(); document.getElementById('staffSelect').onchange = updateLocs; document.getElementById('sStaff').onchange = updateSchedLocs; document.getElementById('locSelect').onchange = updateInfo; };
-
         function renderStaffs() {
-            const h = staffs.map((s, i) => `<option value="${i}">${s.name} (#${s.id})</option>`).join('');
+            const h = staffs.map((s, i) => `<option value="${i}">${s.name}</option>`).join('');
             document.getElementById('staffSelect').innerHTML = h; document.getElementById('sStaff').innerHTML = h;
         }
 
         function updateLocs() {
-            const sIdx = document.getElementById('staffSelect').value;
-            const s = staffs[sIdx]; if(!s) return;
+            const sIdx = document.getElementById('staffSelect').value; const s = staffs[sIdx]; if(!s) return;
             document.getElementById('locSelect').innerHTML = locs.filter(l => l.owner == "all" || l.owner == s.id).map((l, i) => `<option value="${i}">${l.name}</option>`).join('');
             updateInfo();
         }
 
         function updateSchedLocs() {
-            const sIdx = document.getElementById('sStaff').value;
-            const s = staffs[sIdx]; if(!s) return;
+            const sIdx = document.getElementById('sStaff').value; const s = staffs[sIdx]; if(!s) return;
             document.getElementById('sLoc').innerHTML = locs.filter(l => l.owner == "all" || l.owner == s.id).map((l, i) => `<option value="${i}">${l.name}</option>`).join('');
         }
 
@@ -173,48 +208,9 @@
             if(s) { document.getElementById('lblIP').innerText = s.ip; document.getElementById('lblDevice').innerText = s.device; }
         }
 
-        function addSched() {
-            const t = document.getElementById('sTime').value; if(!t) return alert("Chọn giờ!");
-            const sS = document.getElementById('sStaff'), lS = document.getElementById('sLoc');
-            scheds.push({ id: Date.now(), time: t, type: document.getElementById('sType').value, sIdx: sS.value, sName: sS.options[sS.selectedIndex].text, lIdx: lS.value, lName: lS.options[lS.selectedIndex].text, exec: false, st: "ĐANG ĐỢI" });
-            localStorage.setItem('schedules', JSON.stringify(scheds)); renderSched();
-        }
-
-        function renderSched() {
-            const b = document.getElementById('schedBody'); b.innerHTML = '';
-            scheds.sort((a,b) => new Date(a.time) - new Date(b.time)).forEach(s => {
-                const tr = document.createElement('tr'); if(s.exec) tr.style.opacity = "0.5";
-                const badge = s.type == 'OT' ? 'badge-ot' : 'badge-office';
-                tr.innerHTML = `<td>${new Date(s.time).toLocaleString('vi-VN')}</td><td><span class="${badge}">${s.type}</span></td><td>${s.sName}</td><td>${s.lName}</td><td>${s.st}</td><td style="text-align:right"><button class="btn-del-item" onclick="delS(${s.id})">XÓA</button></td>`;
-                b.appendChild(tr);
-            });
-        }
-
-        window.delS = (id) => { if(confirm("Xóa lịch?")) { scheds = scheds.filter(x => x.id != id); localStorage.setItem('schedules', JSON.stringify(scheds)); renderSched(); }};
-
-        function startClock() {
-            setInterval(() => {
-                const now = new Date(); document.getElementById('clock').innerText = now.toLocaleTimeString('vi-VN');
-                scheds.forEach(s => {
-                    if(!s.exec) {
-                        const diff = now - new Date(s.time);
-                        if(diff >= 0 && diff < 60000) { trigger(s.type, staffs[s.sIdx], locs[s.lIdx]); s.exec = true; s.st = "XONG"; localStorage.setItem('schedules', JSON.stringify(scheds)); renderSched(); }
-                        else if (diff >= 60000) { s.exec = true; s.st = "BỎ QUA"; localStorage.setItem('schedules', JSON.stringify(scheds)); renderSched(); }
-                    }
-                });
-            }, 2000);
-        }
-
-        async function trigger(type, st, lc) {
-            log(`Gửi lệnh [${type}] cho ${st.name}...`);
-            try {
-                const res = await fetch(type == 'OT' ? API_OT : API_OFFICE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ staff_id: st.id, location_data: { lat: lc.lat, long: lc.lng, ip: st.ip, location_name: lc.name } }) });
-                const d = await res.json(); log(`[${res.status}] ${d.message || 'Thành công'}`);
-            } catch (e) { log("Lỗi: Kiểm tra Allow CORS!", "#ff5858"); }
-        }
-
-        function manual(t) { trigger(t, staffs[document.getElementById('staffSelect').value], locs[document.getElementById('locSelect').value]); }
-        function log(m, c = "var(--success)") { const d = document.createElement('div'); d.style.color = (c=="var(--success)" ? "var(--success)" : c); d.innerText = `> ${new Date().toLocaleTimeString()} ${m}`; document.getElementById('logs').prepend(d); }
+        setInterval(loadSchedFromSheet, 20000);
+        setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString('vi-VN'); }, 1000);
+        window.onload = () => { fetchCloudData(); loadSchedFromSheet(); document.getElementById('staffSelect').onchange = updateLocs; document.getElementById('sStaff').onchange = updateSchedLocs; document.getElementById('locSelect').onchange = updateInfo; };
     </script>
 </body>
 </html>
