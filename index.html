@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>T98 Cloud Tool v54</title>
+    <title>T98 Cloud Tool v54 - Confirm Edition</title>
     <style>
         :root { --primary: #00f2fe; --secondary: #4facfe; --accent-ot: #fa709a; --accent-ot-end: #fee140; --success: #43e97b; --danger: #ff5858; --text: #e0e6ed; --text-muted: #8ba0b6; --border: rgba(255,255,255,0.15); }
         body { margin: 0; padding: 20px; font-family: 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: var(--text); display: grid; grid-template-columns: 360px 1fr; gap: 25px; height: 100vh; box-sizing: border-box; overflow: hidden; }
@@ -47,8 +47,8 @@
         <div class="card">
             <h2>CHẤM CÔNG THỦ CÔNG</h2>
             <div class="btn-row">
-                <button onclick="manual('HÀNH CHÍNH')" class="btn-office">HÀNH CHÍNH</button>
-                <button onclick="manual('OT')" class="btn-ot">TĂNG CA (OT)</button>
+                <button onclick="confirmManual('HÀNH CHÍNH')" class="btn-office">HÀNH CHÍNH</button>
+                <button onclick="confirmManual('OT')" class="btn-ot">TĂNG CA (OT)</button>
             </div>
         </div>
         <div class="card">
@@ -126,6 +126,26 @@
         function updateInfo() {
             const s = staffs[document.getElementById('staffSelect').value];
             if(s) { document.getElementById('lblIP').innerText = s.ip; document.getElementById('lblDevice').innerText = s.device; }
+        }
+
+        // PHẦN THÔNG BÁO XÁC NHẬN KHI BẤM NÚT THỦ CÔNG
+        function confirmManual(type) {
+            const sSelect = document.getElementById('staffSelect');
+            const lSelect = document.getElementById('locSelect');
+            
+            const staffName = sSelect.options[sSelect.selectedIndex].text;
+            const locName = lSelect.options[lSelect.selectedIndex].text;
+            const currentTime = new Date().toLocaleTimeString('vi-VN');
+
+            const msg = `XÁC NHẬN CHẤM CÔNG:\n` +
+                        `- Loại: ${type}\n` +
+                        `- Nhân viên: ${staffName}\n` +
+                        `- Địa điểm: ${locName}\n` +
+                        `- Thời gian: ${currentTime}`;
+
+            if(confirm(msg)) {
+                manual(type);
+            }
         }
 
         function addSched() {
